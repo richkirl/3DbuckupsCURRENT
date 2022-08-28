@@ -1,0 +1,48 @@
+#version 450 core
+
+in vec2 pass_textureCoords;
+in vec3 surfacesNormal;
+in vec3 toLightVector;
+in vec3 toCameraVector;
+in float visibility;
+
+out vec4 out_Color;
+
+uniform sampler2D backgroundTexture;
+uniform sampler2D rTexture;
+uniform sampler2D gTexture;
+uniform sampler2D bTexture;
+uniform sampler2D blendMap;
+uniform vec3 lightCol;
+uniform float shineDamper;
+uniform float reflectivity;
+uniform vec3 skyCol;
+void main(void){
+	vec4 blendMapCol = texture(blendMap,pass_textureCoords);
+	
+	float backTextureAmount = 1 - (blendMapCol.r+blendMapCol.g+blendMapCol.b);
+	vec2 tiledCoords = pass_textureCoords *300.0;
+	vec4 backgroundTextureCol = texture(backgroundTexture,tiledCoords)*backTextureAmount;
+	vec4 rTextureCol = texture(rTexture,tiledCoords)*blendMapCol.r;
+	vec4 gTextureCol = texture(gTexture,tiledCoords)*blendMapCol.g;
+	vec4 bTextureCol = texture(bTexture,tiledCoords)*blendMapCol.b;
+	
+	vec4 totalCol = backgroundTextureCol + rTextureCol + gTextureCol + bTextureCol;
+	
+	
+	vec3 unitNormal = normalize(surfacesNormal);
+	vec3 unitLightVector = normalize(toLightVector);
+	float nDotl = dot(unitNormal,unitLightVector);
+	float brightness = max(nDotl,0.2);
+	vec3 diffuse = brightness * lightCol;
+	vec3 unitVectorToCamera = normalize(toCameraVector);
+	vec3 lightDirection = -unitLightVector;
+	vec3 reflectedLightDirection = reflect(lightDirection,unitNormal);
+	float specularFactor = dot(reflectedLightDirection,unitVectorToCamera);
+	specularFactor = max(specularFactor,0.0);
+	float dampedFactor = pow(specularFactor,shineDamper);
+	vec3 finalSpecular = dampedFactor * reflectivity * lightCol;
+	out_Color=vec4(diffuse,1.0)*totalCol+vec4(finalSpecular,1.0);
+
+	out_Color = mix(vec4(skyCol,1.0),out_Color,visibility);
+}
